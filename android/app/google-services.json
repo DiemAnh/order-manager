@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1014727677652",
+    "project_id": "order-m-15dc2",
+    "storage_bucket": "order-m-15dc2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1014727677652:android:b4d3d9bb1f70f730408d41",
+        "android_client_info": {
+          "package_name": "com.example.order_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsi-wwNdrPWPGFnG4vx9g_0YAvR3XXUGI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1014727677652:android:cb6c942edced3526408d41",
+        "android_client_info": {
+          "package_name": "com.ordermanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsi-wwNdrPWPGFnG4vx9g_0YAvR3XXUGI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
