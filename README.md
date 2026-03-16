@@ -1,7 +1,5 @@
 # order_manager
 
-A new Flutter project.
-
 ## Getting Started
 The project focuses on providing a clear and simple interface for managing restaurant operations such as order tracking, kitchen preparation, payment management, and report exportation.
 
