@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:order_manager/data/enum/status_enum.dart';
-import 'package:order_manager/data/models/order_model.dart';
+import 'dart:collection';
 
 class KitchenStore {
-  static ValueNotifier<List<KitchenItem>> items =
-      ValueNotifier<List<KitchenItem>>([]);
+  static ValueNotifier<LinkedList<KitchenItem>> items =
+      ValueNotifier<LinkedList<KitchenItem>>(LinkedList<KitchenItem>());
 }
 
-class KitchenItem {
+final class KitchenItem extends LinkedListEntry<KitchenItem> {
   String? foodName;
   int? table;
   String? staffId;

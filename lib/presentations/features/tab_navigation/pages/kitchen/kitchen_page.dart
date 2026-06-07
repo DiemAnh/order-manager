@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:order_manager/data/enum/status_enum.dart';
 import 'package:order_manager/data/models/kitchen_store.dart';
+import 'dart:collection';
 
 class KitchenPage extends StatefulWidget {
   const KitchenPage({super.key});
@@ -28,17 +29,18 @@ class _KitchenPageState extends State<KitchenPage> {
         ),
       ),
 
-      body: ValueListenableBuilder<List<KitchenItem>>(
+      body: ValueListenableBuilder<LinkedList<KitchenItem>>(
         valueListenable: KitchenStore.items,
         builder: (context, items, _) {
-          final visibleItems = items
-              .where(
-                (e) =>
-                    e.status != KitchenStatus.served &&
-                    e.status != KitchenStatus.paid &&
-                    e.status != KitchenStatus.cancelled,
-              )
-              .toList();
+          // Filter and collect visible items from LinkedList
+          final visibleItems = <KitchenItem>[];
+          for (var item in items) {
+            if (item.status != KitchenStatus.served &&
+                item.status != KitchenStatus.paid &&
+                item.status != KitchenStatus.cancelled) {
+              visibleItems.add(item);
+            }
+          }
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -77,7 +79,7 @@ class _KitchenItemCardState extends State<KitchenItemCard> {
       widget.item.status = KitchenStatus.cooking;
     });
 
-    KitchenStore.items.notifyListeners();
+    _notifyKitchenStoreUpdate();
   }
 
   void finishCooking() {
@@ -85,7 +87,7 @@ class _KitchenItemCardState extends State<KitchenItemCard> {
       widget.item.status = KitchenStatus.finished;
     });
 
-    KitchenStore.items.notifyListeners();
+    _notifyKitchenStoreUpdate();
   }
 
   void serveCustomer() {
@@ -93,7 +95,7 @@ class _KitchenItemCardState extends State<KitchenItemCard> {
       widget.item.status = KitchenStatus.served;
     });
 
-    KitchenStore.items.notifyListeners();
+    _notifyKitchenStoreUpdate();
   }
 
   void cancelFood() {
@@ -101,7 +103,14 @@ class _KitchenItemCardState extends State<KitchenItemCard> {
       widget.item.status = KitchenStatus.cancelled;
     });
 
-    KitchenStore.items.notifyListeners();
+    _notifyKitchenStoreUpdate();
+  }
+
+  void _notifyKitchenStoreUpdate() {
+    // Create a new LinkedList to trigger ValueNotifier updates
+    final newList = LinkedList<KitchenItem>();
+    newList.addAll(KitchenStore.items.value);
+    KitchenStore.items.value = newList;
   }
 
   @override

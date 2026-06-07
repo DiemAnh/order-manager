@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:order_manager/data/enum/status_enum.dart';
 import 'package:order_manager/data/models/kitchen_store.dart';
 import 'package:order_manager/data/models/order_model.dart';
+import 'dart:collection';
 
 class OrderPage extends StatefulWidget {
   const OrderPage({super.key});
@@ -125,7 +126,7 @@ class _MyHomePageState extends State<OrderPage> {
                       ),
                     );
 
-                    KitchenStore.items.notifyListeners();
+                    _notifyKitchenStoreUpdate();
 
                     Navigator.pop(context);
                   },
@@ -137,7 +138,12 @@ class _MyHomePageState extends State<OrderPage> {
         );
       },
     );
-    KitchenStore.items.notifyListeners();
+  }
+
+  void _notifyKitchenStoreUpdate() {
+    final newList = LinkedList<KitchenItem>();
+    newList.addAll(KitchenStore.items.value);
+    KitchenStore.items.value = newList;
   }
 
   void _payOrder(Order order) {
@@ -159,7 +165,7 @@ class _MyHomePageState extends State<OrderPage> {
       item.status = KitchenStatus.paid;
     }
 
-    KitchenStore.items.notifyListeners();
+    _notifyKitchenStoreUpdate();
 
     setState(() {
       orders.remove(order);
@@ -184,15 +190,15 @@ class _MyHomePageState extends State<OrderPage> {
 
     setState(() {
       orders.remove(order);
+    });
 
     for (var item in KitchenStore.items.value) {
-  if (item.orderId == order.id) {
-    item.status = KitchenStatus.cancelled;
-  }
-}
+      if (item.orderId == order.id) {
+        item.status = KitchenStatus.cancelled;
+      }
+    }
 
-      KitchenStore.items.notifyListeners();
-    });
+    _notifyKitchenStoreUpdate();
   }
 
   @override
@@ -356,16 +362,16 @@ class _MyHomePageState extends State<OrderPage> {
             ],
           ),
           const SizedBox(height: 8),
-          ValueListenableBuilder<List<KitchenItem>>(
+          ValueListenableBuilder<LinkedList<KitchenItem>>(
             valueListenable: KitchenStore.items,
             builder: (context, items, _) {
-              final tableItems = items
-                  .where(
-                    (item) =>
-                        item.orderId == order.id &&
-                        item.status != KitchenStatus.paid,
-                  )
-                  .toList();
+              // Filter items for this order that are not paid
+              final tableItems = <KitchenItem>[];
+              for (var item in items) {
+                if (item.orderId == order.id && item.status != KitchenStatus.paid) {
+                  tableItems.add(item);
+                }
+              }
 
               return Column(
                 children: tableItems.map((item) {
@@ -445,12 +451,10 @@ class _MyHomePageState extends State<OrderPage> {
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () {
                               setState(() {
-                                KitchenStore.items.value = List.from(
-                                  KitchenStore.items.value,
-                                )..remove(item);
-
+                                item.unlink();
                                 order.totalItems -= 1;
                               });
+                              _notifyKitchenStoreUpdate();
                             },
                           ),
                       ],
@@ -465,20 +469,21 @@ class _MyHomePageState extends State<OrderPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              ValueListenableBuilder<List<KitchenItem>>(
+              ValueListenableBuilder<LinkedList<KitchenItem>>(
                 valueListenable: KitchenStore.items,
                 builder: (context, items, _) {
-                  final totalReturned = items
-                      .where(
-                        (item) =>
-                            item.orderId == order.id &&
-                            item.status == KitchenStatus.served,
-                      )
-                      .fold<int>(0, (sum, item) => sum + (item.quantity ?? 0));
+                  int totalReturned = 0;
+                  int totalOrdered = 0;
+                  
+                  for (var item in items) {
+                    if (item.orderId == order.id) {
+                      totalOrdered += item.quantity ?? 0;
+                      if (item.status == KitchenStatus.served) {
+                        totalReturned += item.quantity ?? 0;
+                      }
+                    }
+                  }
 
-                  final totalOrdered = items
-                      .where((item) => item.orderId == order.id)
-                      .fold<int>(0, (sum, item) => sum + (item.quantity ?? 0));
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

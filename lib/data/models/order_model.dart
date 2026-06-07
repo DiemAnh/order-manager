@@ -1,5 +1,6 @@
 import 'package:order_manager/data/enum/status_enum.dart';
 import 'package:order_manager/data/models/food_model.dart';
+import 'dart:collection';
 
 class Order {
   String? id;
@@ -10,7 +11,7 @@ class Order {
   DateTime createdAt;
   String? staffName;
   String? staffId;
-  List<FoodItem> foods;
+  LinkedList<FoodItem> foods;
 
   Order({
     required this.id,
@@ -21,6 +22,6 @@ class Order {
     required this.createdAt,
     this.staffName,
     this.staffId,
-    List<FoodItem>? foods
-  }) : foods = foods ?? [];
+    LinkedList<FoodItem>? foods
+  }) : foods = foods ?? LinkedList<FoodItem>();
 }

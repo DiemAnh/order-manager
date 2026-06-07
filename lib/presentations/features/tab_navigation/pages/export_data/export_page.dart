@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:order_manager/data/enum/status_enum.dart';
 import 'package:order_manager/data/models/kitchen_store.dart';
-import 'package:order_manager/data/models/order_model.dart';
 import 'dart:io';
+import 'dart:collection';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -29,22 +29,27 @@ class ExportPage extends StatelessWidget {
       body: ValueListenableBuilder(
         valueListenable: KitchenStore.items,
         builder: (context, items, _) {
-          final tables = items.map((e) => e.orderId).toSet();
+          // Track unique order IDs and their statuses
+          final Map<String?, bool> tableStatuses = {}; // orderId -> has non-paid item
+          int totalPaid = 0;
+          int totalCancelled = 0;
 
-          final serving = items
-              .where((e) => e.status != KitchenStatus.paid)
-              .map((e) => e.orderId)
-              .toSet();
+          for (var item in items) {
+            tableStatuses.putIfAbsent(item.orderId, () => false);
+            
+            if (item.status != KitchenStatus.paid) {
+              tableStatuses[item.orderId] = true;
+            }
+            if (item.status == KitchenStatus.paid) {
+              totalPaid++;
+            }
+            if (item.status == KitchenStatus.cancelled) {
+              totalCancelled++;
+            }
+          }
 
-          final paid = items
-              .where((e) => e.status == KitchenStatus.paid)
-              .map((e) => e.orderId)
-              .toSet();
-
-          final cancelled = items
-              .where((e) => e.status == KitchenStatus.cancelled)
-              .map((e) => e.orderId)
-              .toSet();
+          final totalTables = tableStatuses.length;
+          final totalServing = tableStatuses.values.where((v) => v).length;
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -54,7 +59,7 @@ class ExportPage extends StatelessWidget {
 
               _buildStatCard(
                 "Tổng đơn hàng",
-                "${tables.length}",
+                "$totalTables",
                 Icons.description,
                 Colors.black,
               ),
@@ -63,7 +68,7 @@ class ExportPage extends StatelessWidget {
 
               _buildStatCard(
                 "Đang phục vụ",
-                "${serving.length}",
+                "$totalServing",
                 Icons.access_time,
                 Colors.blue,
               ),
@@ -72,7 +77,7 @@ class ExportPage extends StatelessWidget {
 
               _buildStatCard(
                 KitchenStatus.paid.text,
-                "${paid.length}",
+                "$totalPaid",
                 Icons.check_circle,
                 Colors.green,
               ),
@@ -81,7 +86,7 @@ class ExportPage extends StatelessWidget {
 
               _buildStatCard(
                 "Đã hủy",
-                "${cancelled.length}",
+                "$totalCancelled",
                 Icons.cancel,
                 Colors.red,
               ),
@@ -196,8 +201,26 @@ class ExportPage extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentOrders(List items) {
-    final tables = items.map((e) => e.orderId).toSet().toList();
+  Widget _buildRecentOrders(LinkedList<KitchenItem> items) {
+    final Map<String?, KitchenStatus> orderStatuses = {};
+    
+    // Collect unique orders and determine their status
+    for (var item in items) {
+      if (!orderStatuses.containsKey(item.orderId)) {
+        orderStatuses[item.orderId] = item.status;
+      }
+      
+      // Determine the overall order status based on items
+      if (item.status == KitchenStatus.cancelled && orderStatuses[item.orderId] != KitchenStatus.cancelled) {
+        orderStatuses[item.orderId] = KitchenStatus.cancelled;
+      } else if (item.status == KitchenStatus.paid && orderStatuses[item.orderId] != KitchenStatus.cancelled) {
+        orderStatuses[item.orderId] = KitchenStatus.paid;
+      } else if (item.status == KitchenStatus.served && 
+                 orderStatuses[item.orderId] != KitchenStatus.cancelled && 
+                 orderStatuses[item.orderId] != KitchenStatus.paid) {
+        orderStatuses[item.orderId] = KitchenStatus.served;
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -214,31 +237,26 @@ class ExportPage extends StatelessWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          ...tables.map((table) {
-            final tableItems = items.where((e) => e.orderId == table).toList();
-
-            KitchenStatus status;
-
-            if (tableItems.any((e) => e.status == KitchenStatus.cancelled)) {
-              status = KitchenStatus.cancelled;
-            } else if (tableItems.any((e) => e.status == KitchenStatus.paid)) {
-              status = KitchenStatus.paid;
-            } else if (tableItems.any(
-              (e) => e.status == KitchenStatus.served,
-            )) {
-              status = KitchenStatus.served;
-            } else {
-              status = KitchenStatus.pending;
+          ...orderStatuses.entries.map((entry) {
+            final orderId = entry.key;
+            final status = entry.value;
+            
+            // Get items for this order
+            List<KitchenItem> tableItems = [];
+            for (var item in items) {
+              if (item.orderId == orderId) {
+                tableItems.add(item);
+              }
             }
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _buildOrderItem(
-                "ORD-${table.hashCode}",
-                "Bàn $table",
+                "ORD-${orderId.hashCode}",
+                "Bàn $orderId",
                 "${tableItems.length} món",
                 status.text,
-                tableItems.first.createdAt.toString(),
+                tableItems.isNotEmpty ? tableItems.first.createdAt.toString() : "",
               ),
             );
           }),
@@ -302,7 +320,7 @@ class ExportPage extends StatelessWidget {
 
   Future<void> exportReport(
     BuildContext context,
-    List<KitchenItem> items,
+    LinkedList<KitchenItem> items,
   ) async {
     if (items.isEmpty) {
       ScaffoldMessenger.of(
@@ -312,26 +330,33 @@ class ExportPage extends StatelessWidget {
     }
 
     final buffer = StringBuffer();
-    final Map<String, int> menuPrice = {
-      "Phở bò": 50000,
-      "Bún chả": 45000,
-      "Cơm tấm": 40000,
-      "Bánh mì": 25000,
-      "Nem rán": 30000,
-      "Gỏi cuốn": 35000,
-      "Nước ngọt": 15000,
-      "Nước chanh": 20000,
-      "Trà đá": 5000,
-    };
+    final LinkedHashMap<String, int> menuPrice = LinkedHashMap<String, int>();
+    menuPrice["Phở bò"] = 50000;
+    menuPrice["Bún chả"] = 45000;
+    menuPrice["Cơm tấm"] = 40000;
+    menuPrice["Bánh mì"] = 25000;
+    menuPrice["Nem rán"] = 30000;
+    menuPrice["Gỏi cuốn"] = 35000;
+    menuPrice["Nước ngọt"] = 15000;
+    menuPrice["Nước chanh"] = 20000;
+    menuPrice["Trà đá"] = 5000;
 
     buffer.writeln("===== BÁO CÁO ĐƠN HÀNG =====");
     buffer.writeln("Thời gian: ${DateTime.now()}");
     buffer.writeln("");
 
-    final orders = items.map((e) => e.orderId).toSet();
+    // Collect unique order IDs from the linked list
+    final Set<String?> orders = {};
+    for (var it in items) {
+      orders.add(it.orderId);
+    }
 
     for (var orderId in orders) {
-      final orderItems = items.where((e) => e.orderId == orderId).toList();
+      // Collect items for this orderId by iterating the linked list
+      final List<KitchenItem> orderItems = [];
+      for (var it in items) {
+        if (it.orderId == orderId) orderItems.add(it);
+      }
 
       if (orderItems.isEmpty) continue;
 

@@ -1,4 +1,6 @@
-class FoodItem {
+import 'dart:collection';
+
+final class FoodItem extends LinkedListEntry<FoodItem> {
   String id;
   String name;
   int ordered;

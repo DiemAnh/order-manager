@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:order_manager/data/enum/status_enum.dart';
 import 'package:order_manager/data/models/kitchen_store.dart';
+import 'dart:collection';
 
 class PaymentPage extends StatelessWidget {
   PaymentPage({super.key});
 
-  final Map<String, int> menuPrice = {
-    "Phở bò": 50000,
-    "Bún chả": 45000,
-    "Cơm tấm": 40000,
-    "Bánh mì": 25000,
-    "Nem rán": 30000,
-    "Gỏi cuốn": 35000,
-    "Nước ngọt": 15000,
-    "Nước chanh": 20000,
-    "Trà đá": 5000,
-  };
+  final LinkedHashMap<String, int> menuPrice = _initializeMenuPrice();
+
+  static LinkedHashMap<String, int> _initializeMenuPrice() {
+    final LinkedHashMap<String, int> prices = LinkedHashMap<String, int>();
+    prices["Phở bò"] = 50000;
+    prices["Bún chả"] = 45000;
+    prices["Cơm tấm"] = 40000;
+    prices["Bánh mì"] = 25000;
+    prices["Nem rán"] = 30000;
+    prices["Gỏi cuốn"] = 35000;
+    prices["Nước ngọt"] = 15000;
+    prices["Nước chanh"] = 20000;
+    prices["Trà đá"] = 5000;
+    return prices;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,11 +42,8 @@ class PaymentPage extends StatelessWidget {
       body: ValueListenableBuilder(
         valueListenable: KitchenStore.items,
         builder: (context, items, _) {
-          final tables = items
-              .where((e) => e.status != KitchenStatus.paid)
-              .map((e) => e.table)
-              .toSet()
-              .toList();
+          // Build table data structure directly from LinkedList
+          final Map<int?, (int returned, int total)> tableData = {};
           int totalRevenue = 0;
           int totalReturned = 0;
 
@@ -51,42 +53,37 @@ class PaymentPage extends StatelessWidget {
               final qty = item.quantity ?? 0;
               totalReturned += qty;
               totalRevenue += price * qty;
+              
+              tableData.update(
+                item.table,
+                (current) => (current.$1 + qty, current.$2 + (price * qty)),
+                ifAbsent: () => (qty, price * qty),
+              );
+            } else if (item.status != KitchenStatus.paid) {
+              tableData.putIfAbsent(item.table, () => (0, 0));
             }
           }
 
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              ...tables.map((table) {
-                final tableItems = items
-                    .where((e) => e.table == table)
-                    .toList();
-
-                int tableReturned = 0;
-                int tableTotal = 0;
-
-                for (var item in tableItems) {
-                  if (item.status == KitchenStatus.served) {
-                    final price = menuPrice[item.foodName ?? ""] ?? 0;
-                    final qty = item.quantity ?? 0;
-                    tableReturned += qty;
-                    tableTotal += price * qty;
-                  }
-                }
+              ...tableData.entries.map((entry) {
+                final table = entry.key;
+                final (returned, total) = entry.value;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: TableCard(
                     tableName: "Bàn $table",
-                    returned: tableReturned,
-                    total: tableTotal,
+                    returned: returned,
+                    total: total,
                   ),
                 );
               }),
               const SizedBox(height: 4),
               OverviewCard(
-                tables: tables.length,
-                orders: tables.length,
+                tables: tableData.length,
+                orders: tableData.length,
                 returned: totalReturned,
                 revenue: totalRevenue,
               ),
